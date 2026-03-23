@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CivicLens — Sign In</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:             #f8f8f6;
+    --surface:        #ffffff;
+    --border:         #e8e8e4;
+    --text-primary:   #1a1a18;
+    --text-secondary: #5a5a54;
+    --text-muted:     #9a9a90;
+    --blue:           #2d6be4;
+    --blue-light:     #eef3fc;
+    --green:          #2a8c5a;
+    --green-light:    #edf7f2;
+    --red:            #c93030;
+    --red-light:      #fdf0f0;
+    --shadow-md:      0 4px 24px rgba(0,0,0,0.08);
+    --radius:         14px;
+  }
+
+  html, body {
+    height: 100%; font-family: 'DM Sans', sans-serif;
+    background: var(--bg); color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 24px;
+  }
+
+  .logo {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.5rem; color: var(--text-primary);
+    text-decoration: none; margin-bottom: 32px;
+    letter-spacing: -0.02em; display: inline-block;
+  }
+  .logo span { color: var(--blue); font-style: italic; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 40px 36px;
+    width: 100%; max-width: 400px;
+    box-shadow: var(--shadow-md);
+  }
+
+  .card-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.7rem; letter-spacing: -0.02em; margin-bottom: 6px;
+  }
+  .card-sub {
+    font-size: 0.875rem; color: var(--text-muted);
+    margin-bottom: 28px; line-height: 1.6;
+  }
+
+  /* Tab switcher */
+  .tab-row {
+    display: flex;
+    border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden;
+    margin-bottom: 24px;
+  }
+  .tab-btn {
+    flex: 1; padding: 10px;
+    background: transparent; border: none;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.875rem; font-weight: 500;
+    color: var(--text-muted); cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .tab-btn.active { background: var(--blue); color: #fff; }
+
+  .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+  label {
+    font-size: 0.78rem; font-weight: 600;
+    color: var(--text-secondary);
+    letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  input[type="email"], input[type="password"] {
+    width: 100%; padding: 11px 14px;
+    border: 1.5px solid var(--border); border-radius: 10px;
+    font-family: 'DM Sans', sans-serif; font-size: 0.95rem;
+    color: var(--text-primary); background: var(--bg);
+    outline: none; transition: border-color 0.18s;
+  }
+  input:focus { border-color: var(--blue); background: var(--surface); }
+  input::placeholder { color: var(--text-muted); }
+
+  .btn-submit {
+    width: 100%; padding: 12px; margin-top: 8px;
+    background: var(--blue); color: #fff;
+    border: none; border-radius: 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem; font-weight: 600;
+    cursor: pointer; transition: opacity 0.18s;
+  }
+  .btn-submit:hover { opacity: 0.88; }
+  .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .or-divider {
+    display: flex; align-items: center; gap: 12px;
+    margin: 20px 0; color: var(--text-muted); font-size: 0.8rem;
+  }
+  .or-divider::before, .or-divider::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+
+  .btn-google {
+    width: 100%; padding: 11px;
+    background: var(--surface); color: var(--text-primary);
+    border: 1.5px solid var(--border); border-radius: 10px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem; font-weight: 500;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    transition: border-color 0.18s, box-shadow 0.18s;
+  }
+  .btn-google:hover { border-color: var(--text-muted); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .btn-google svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+  .msg {
+    display: none; margin-top: 16px;
+    padding: 11px 14px; border-radius: 10px;
+    font-size: 0.875rem; font-weight: 500; line-height: 1.5;
+  }
+  .msg.error   { display: block; background: var(--red-light);   color: var(--red);   border: 1px solid #f5c6c6; }
+  .msg.success { display: block; background: var(--green-light); color: var(--green); border: 1px solid #b2dfc7; }
+  .msg.info    { display: block; background: var(--blue-light);  color: var(--blue);  border: 1px solid #c4d8f8; }
+
+  .back-link {
+    margin-top: 24px; font-size: 0.82rem; color: var(--text-muted);
+    text-decoration: none; transition: color 0.15s; display: inline-block;
+  }
+  .back-link:hover { color: var(--text-primary); }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <a href="index.html" class="logo">Civic<span>Lens</span></a>
+
+  <div class="card">
+    <h1 class="card-title">Welcome</h1>
+    <p class="card-sub">Sign in or create an account to continue.</p>
+
+    <!-- Tab Switcher -->
+    <div class="tab-row">
+      <button class="tab-btn active" id="tabLogin" onclick="switchTab('login')">Log In</button>
+      <button class="tab-btn" id="tabSignup" onclick="switchTab('signup')">Sign Up</button>
+    </div>
+
+    <div class="field">
+      <label for="email">Email address</label>
+      <input type="email" id="email" placeholder="you@example.com" autocomplete="email" />
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input type="password" id="password" placeholder="••••••••" autocomplete="current-password" />
+    </div>
+
+    <button class="btn-submit" id="submitBtn" onclick="handleSubmit()">Log In</button>
+
+    <div class="or-divider">or</div>
+
+    <button class="btn-google" onclick="handleGoogle()">
+      <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+      </svg>
+      Continue with Google
+    </button>
+
+    <div class="msg" id="msg"></div>
+  </div>
+
+  <a href="index.html" class="back-link">← Back to home</a>
+</div>
+
+<script>
+  // ── Keys (already filled in) ────────────────────────────────────
+  const SUPABASE_URL      = "https://bloaxjfbwpgetpvdguvv.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJsb2F4amZid3BnZXRwdmRndXZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxNDU5OTIsImV4cCI6MjA4OTcyMTk5Mn0.WHVF9Ts9JdE_cW2m8Q_6lFyl-URgFg-C-v482OCnT-0";
+
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  let currentTab = "login";
+
+  // If already logged in → go to app
+  (async () => {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) window.location.href = "app.html";
+  })();
+
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === "SIGNED_IN" && session) window.location.href = "app.html";
+  });
+
+  // Tab switcher
+  function switchTab(tab) {
+    currentTab = tab;
+    document.getElementById("tabLogin").classList.toggle("active", tab === "login");
+    document.getElementById("tabSignup").classList.toggle("active", tab === "signup");
+    document.getElementById("submitBtn").textContent = tab === "login" ? "Log In" : "Create Account";
+    document.getElementById("msg").className = "msg";
+    document.getElementById("msg").textContent = "";
+  }
+
+  // Message helper
+  function showMsg(text, type = "error") {
+    const el = document.getElementById("msg");
+    el.textContent = text;
+    el.className = "msg " + type;
+  }
+
+  // Email login / signup
+  async function handleSubmit() {
+    const email    = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
+    const btn      = document.getElementById("submitBtn");
+
+    if (!email || !password) { showMsg("Please enter your email and password."); return; }
+    if (password.length < 6) { showMsg("Password must be at least 6 characters."); return; }
+
+    btn.disabled    = true;
+    btn.textContent = currentTab === "login" ? "Logging in…" : "Creating account…";
+
+    if (currentTab === "login") {
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) {
+        showMsg(error.message);
+        btn.disabled = false; btn.textContent = "Log In";
+        return;
+      }
+      showMsg("Login successful — redirecting…", "success");
+      setTimeout(() => { window.location.href = "app.html"; }, 600);
+
+    } else {
+      const { error } = await sb.auth.signUp({ email, password });
+      if (error) {
+        showMsg(error.message);
+        btn.disabled = false; btn.textContent = "Create Account";
+        return;
+      }
+      showMsg("Account created! Check your email to confirm, then log in.", "success");
+      btn.disabled = false; btn.textContent = "Create Account";
+      setTimeout(() => switchTab("login"), 2000);
+    }
+  }
+
+  // Google OAuth
+  async function handleGoogle() {
+    const { error } = await sb.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: "http://127.0.0.1:5500/frontend/app.html"
+      }
+    });
+    if (error) showMsg("Google sign-in failed: " + error.message);
+  }
+
+  // Enter key support
+  ["email", "password"].forEach(id => {
+    document.getElementById(id).addEventListener("keydown", e => {
+      if (e.key === "Enter") handleSubmit();
+    });
+  });
+</script>
+
+</body>
+</html>

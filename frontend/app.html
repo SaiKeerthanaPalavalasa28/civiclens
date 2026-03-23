@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CivicLens — Policy Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:#f8f8f6; --surface:#ffffff; --border:#e8e8e4;
+    --text-primary:#1a1a18; --text-secondary:#5a5a54; --text-muted:#9a9a90;
+    --blue:#2d6be4; --blue-light:#eef3fc;
+    --green:#2a8c5a; --green-light:#edf7f2;
+    --red:#c93030; --red-light:#fdf0f0;
+    --amber:#b45309; --amber-light:#fdf5e6;
+    --shadow-sm:0 1px 4px rgba(0,0,0,0.06),0 2px 12px rgba(0,0,0,0.04);
+    --shadow-lg:0 20px 60px rgba(0,0,0,0.15);
+    --radius:12px; --radius-lg:20px;
+  }
+  html,body { min-height:100vh; font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text-primary); -webkit-font-smoothing:antialiased; }
+
+  /* TOP BAR */
+  .topbar { position:sticky; top:0; z-index:100; height:60px; background:rgba(248,248,246,0.92); backdrop-filter:blur(14px); border-bottom:1px solid var(--border); padding:0 40px; display:flex; align-items:center; justify-content:space-between; }
+  .topbar-logo { font-family:'DM Serif Display',serif; font-size:1.2rem; color:var(--text-primary); text-decoration:none; letter-spacing:-0.02em; }
+  .topbar-logo span { color:var(--blue); font-style:italic; }
+  .topbar-right { display:flex; align-items:center; gap:16px; }
+  .user-email { font-size:0.82rem; color:var(--text-muted); }
+  .btn-logout { padding:7px 16px; border:1px solid var(--border); border-radius:8px; background:transparent; font-family:'DM Sans',sans-serif; font-size:0.82rem; font-weight:500; color:var(--text-secondary); cursor:pointer; transition:border-color 0.15s,color 0.15s; }
+  .btn-logout:hover { border-color:var(--red); color:var(--red); }
+
+  /* MAIN */
+  .main { max-width:820px; margin:0 auto; padding:52px 24px 80px; }
+  .page-heading { font-family:'DM Serif Display',serif; font-size:clamp(1.8rem,4vw,2.4rem); letter-spacing:-0.02em; margin-bottom:8px; }
+  .page-sub { font-size:0.95rem; color:var(--text-muted); margin-bottom:40px; font-weight:300; }
+
+  /* INPUT CARD */
+  .input-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:32px; box-shadow:var(--shadow-sm); }
+  .input-label { display:block; font-size:0.78rem; font-weight:600; color:var(--text-secondary); letter-spacing:0.06em; text-transform:uppercase; margin-bottom:10px; }
+  textarea#policyInput { width:100%; min-height:160px; padding:14px 16px; border:1.5px solid var(--border); border-radius:var(--radius); font-family:'DM Sans',sans-serif; font-size:0.95rem; color:var(--text-primary); background:var(--bg); resize:vertical; outline:none; line-height:1.6; transition:border-color 0.18s; }
+  textarea#policyInput:focus { border-color:var(--blue); background:var(--surface); }
+  textarea#policyInput::placeholder { color:var(--text-muted); }
+  .input-footer { display:flex; align-items:center; justify-content:space-between; margin-top:16px; flex-wrap:wrap; gap:12px; }
+  .char-count { font-size:0.78rem; color:var(--text-muted); }
+  .btn-analyze { padding:13px 32px; background:var(--blue); color:#fff; border:none; border-radius:10px; font-family:'DM Sans',sans-serif; font-size:0.95rem; font-weight:600; cursor:pointer; display:flex; align-items:center; gap:10px; transition:opacity 0.18s,transform 0.12s,box-shadow 0.18s; }
+  .btn-analyze:hover { opacity:0.9; transform:translateY(-1px); box-shadow:0 6px 20px rgba(45,107,228,0.3); }
+  .btn-analyze:disabled { opacity:0.45; cursor:not-allowed; transform:none; box-shadow:none; }
+  .error-card { display:none; background:var(--red-light); border:1px solid #f5c6c6; border-radius:var(--radius); padding:16px 20px; margin-top:20px; font-size:0.875rem; color:var(--red); font-weight:500; line-height:1.5; white-space:pre-line; }
+  .error-card.visible { display:block; }
+
+  /* LOADING OVERLAY */
+  .loading-overlay { display:none; position:fixed; inset:0; z-index:200; background:rgba(248,248,246,0.94); backdrop-filter:blur(8px); flex-direction:column; align-items:center; justify-content:center; gap:32px; }
+  .loading-overlay.visible { display:flex; }
+  .loading-ring { position:relative; width:110px; height:110px; }
+  .loading-ring svg { width:100%; height:100%; animation:rotate 1.4s linear infinite; }
+  .loading-ring .track { fill:none; stroke:var(--border); stroke-width:6; }
+  .loading-ring .arc   { fill:none; stroke:var(--blue); stroke-width:6; stroke-linecap:round; stroke-dasharray:180 360; animation:dash 1.4s ease-in-out infinite; }
+  @keyframes rotate { to { transform:rotate(360deg); } }
+  @keyframes dash { 0% { stroke-dasharray:20 360; stroke-dashoffset:0; } 50% { stroke-dasharray:200 360; } 100% { stroke-dasharray:20 360; stroke-dashoffset:-360; } }
+  .loading-ring-icon { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:2rem; animation:iconPulse 1.4s ease-in-out infinite; }
+  @keyframes iconPulse { 0%,100% { transform:scale(1); opacity:1; } 50% { transform:scale(0.85); opacity:0.6; } }
+  .loading-title { font-family:'DM Serif Display',serif; font-size:1.4rem; color:var(--text-primary); letter-spacing:-0.02em; }
+  .loading-sub { font-size:0.875rem; color:var(--text-muted); margin-top:4px; text-align:center; }
+  .steps-row { display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; justify-content:center; }
+  .step-pill { padding:6px 16px; border-radius:999px; font-size:0.78rem; font-weight:600; border:1.5px solid var(--border); color:var(--text-muted); background:var(--surface); transition:all 0.4s ease; display:flex; align-items:center; gap:6px; }
+  .step-pill.active { border-color:var(--blue); color:var(--blue); background:var(--blue-light); }
+  .step-pill.done   { border-color:var(--green); color:var(--green); background:var(--green-light); }
+  .step-pill .step-dot { width:6px; height:6px; border-radius:50%; background:currentColor; }
+
+  /* MODAL */
+  .modal-backdrop { display:none; position:fixed; inset:0; z-index:300; background:rgba(26,26,24,0.5); backdrop-filter:blur(4px); align-items:flex-start; justify-content:center; padding:24px 16px 40px; overflow-y:auto; }
+  .modal-backdrop.visible { display:flex; animation:fadeIn 0.25s ease; }
+  @keyframes fadeIn { from { opacity:0; } to { opacity:1; } }
+  .modal { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); width:100%; max-width:900px; box-shadow:var(--shadow-lg); animation:slideUp 0.35s cubic-bezier(0.16,1,0.3,1); overflow:hidden; margin:auto; }
+  @keyframes slideUp { from { opacity:0; transform:translateY(40px) scale(0.97); } to { opacity:1; transform:translateY(0) scale(1); } }
+
+  /* Modal header */
+  .modal-header { padding:24px 28px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; }
+  .modal-header-left { display:flex; align-items:center; gap:20px; flex:1; min-width:0; }
+  .modal-score-ring { position:relative; width:80px; height:80px; flex-shrink:0; }
+  .modal-score-ring svg { width:100%; height:100%; transform:rotate(-90deg); }
+  .ring-track { fill:none; stroke:var(--border); stroke-width:6; }
+  .ring-fill { fill:none; stroke-width:6; stroke-linecap:round; transition:stroke-dashoffset 1.2s cubic-bezier(0.16,1,0.3,1); }
+  .ring-fill.green { stroke:var(--green); }
+  .ring-fill.amber { stroke:var(--amber); }
+  .ring-fill.red   { stroke:var(--red); }
+  .modal-score-num { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; font-family:'DM Serif Display',serif; line-height:1; }
+  .modal-score-num .num { font-size:1.6rem; }
+  .modal-score-num .num.green { color:var(--green); }
+  .modal-score-num .num.amber { color:var(--amber); }
+  .modal-score-num .num.red   { color:var(--red); }
+  .modal-score-num .denom { font-size:0.65rem; color:var(--text-muted); font-family:'DM Sans',sans-serif; }
+  .modal-score-info { flex:1; min-width:0; }
+  .modal-score-title { font-weight:700; font-size:1.05rem; margin-bottom:5px; }
+  .modal-score-just { font-size:0.85rem; color:var(--text-secondary); line-height:1.65; font-weight:300; }
+  .modal-header-actions { display:flex; align-items:center; gap:8px; flex-shrink:0; }
+  .modal-close { width:36px; height:36px; border-radius:50%; background:var(--bg); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:1.1rem; cursor:pointer; color:var(--text-muted); transition:background 0.15s,color 0.15s; }
+  .modal-close:hover { background:var(--red-light); color:var(--red); border-color:var(--red); }
+
+  /* ── LANGUAGE + SPEAK TOOLBAR ── */
+  .modal-toolbar {
+    padding:12px 28px;
+    background:var(--bg);
+    border-bottom:1px solid var(--border);
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  }
+  .toolbar-label { font-size:0.75rem; font-weight:600; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.05em; }
+  .lang-btn {
+    padding:5px 14px; border-radius:999px;
+    font-size:0.8rem; font-weight:600;
+    border:1.5px solid var(--border);
+    background:var(--surface); color:var(--text-secondary);
+    cursor:pointer; transition:all 0.15s;
+  }
+  .lang-btn:hover { border-color:var(--blue); color:var(--blue); }
+  .lang-btn.active { background:var(--blue); color:#fff; border-color:var(--blue); }
+  .toolbar-divider { width:1px; height:20px; background:var(--border); }
+
+  /* Speak button */
+  .btn-speak {
+    padding:5px 16px; border-radius:999px;
+    font-size:0.8rem; font-weight:600;
+    border:1.5px solid var(--border);
+    background:var(--surface); color:var(--text-secondary);
+    cursor:pointer; display:flex; align-items:center; gap:6px;
+    transition:all 0.15s;
+  }
+  .btn-speak:hover { border-color:var(--green); color:var(--green); }
+  .btn-speak.speaking { background:var(--green); color:#fff; border-color:var(--green); animation:speakPulse 1s ease-in-out infinite; }
+  @keyframes speakPulse { 0%,100% { opacity:1; } 50% { opacity:0.7; } }
+
+  /* Translating spinner */
+  .translating-badge { display:none; font-size:0.78rem; color:var(--blue); font-weight:500; align-items:center; gap:6px; }
+  .translating-badge.visible { display:flex; }
+  .translating-spin { width:12px; height:12px; border:2px solid var(--blue-light); border-top-color:var(--blue); border-radius:50%; animation:spin 0.7s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* Modal body */
+  .modal-body { padding:24px 28px 28px; }
+  .analyzed-policy { background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:10px 14px; font-size:0.83rem; color:var(--text-secondary); margin-bottom:20px; line-height:1.5; }
+  .analyzed-policy strong { color:var(--text-primary); font-weight:600; }
+  .results-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; }
+  .result-card { border-radius:var(--radius-lg); padding:18px; border:1px solid var(--border); animation:cardIn 0.5s ease both; }
+  .result-card:nth-child(1) { animation-delay:0.1s; background:#fafffe; border-color:#c8e6d4; }
+  .result-card:nth-child(2) { animation-delay:0.2s; background:#fffafa; border-color:#f5c6c6; }
+  .result-card:nth-child(3) { animation-delay:0.3s; background:#fffdf5; border-color:#f0d99a; }
+  @keyframes cardIn { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+  .result-card-header { display:flex; align-items:center; gap:8px; margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid rgba(0,0,0,0.06); }
+  .result-card-icon { font-size:1rem; }
+  .result-card-title { font-weight:700; font-size:0.85rem; }
+  .result-card-title.green { color:var(--green); }
+  .result-card-title.red   { color:var(--red); }
+  .result-card-title.amber { color:var(--amber); }
+  .result-list { list-style:none; display:flex; flex-direction:column; gap:8px; }
+  .result-list li { display:flex; gap:7px; font-size:0.82rem; color:var(--text-secondary); line-height:1.55; animation:itemIn 0.4s ease both; }
+  .result-list li:nth-child(1) { animation-delay:0.2s; }
+  .result-list li:nth-child(2) { animation-delay:0.3s; }
+  .result-list li:nth-child(3) { animation-delay:0.4s; }
+  .result-list li:nth-child(4) { animation-delay:0.5s; }
+  .result-list li:nth-child(5) { animation-delay:0.6s; }
+  @keyframes itemIn { from { opacity:0; transform:translateX(-8px); } to { opacity:1; transform:none; } }
+  .result-icon { flex-shrink:0; font-size:0.75rem; margin-top:3px; }
+
+  /* Modal footer */
+  .modal-footer { padding:16px 28px 24px; display:flex; justify-content:flex-end; }
+  .btn-new { padding:10px 24px; border:1.5px solid var(--border); border-radius:10px; background:transparent; font-family:'DM Sans',sans-serif; font-size:0.875rem; font-weight:500; color:var(--text-secondary); cursor:pointer; transition:border-color 0.15s,color 0.15s; }
+  .btn-new:hover { border-color:var(--blue); color:var(--blue); }
+
+  @media (max-width:640px) {
+    .topbar { padding:0 20px; }
+    .results-grid { grid-template-columns:1fr; }
+    .user-email { display:none; }
+    .modal-body,.modal-header,.modal-footer,.modal-toolbar { padding-left:16px; padding-right:16px; }
+    .steps-row { flex-direction:column; align-items:center; }
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a href="index.html" class="topbar-logo">Civic<span>Lens</span></a>
+  <div class="topbar-right">
+    <span class="user-email" id="userEmail"></span>
+    <button class="btn-logout" onclick="handleLogout()">Log out</button>
+  </div>
+</header>
+
+<main class="main">
+  <h1 class="page-heading">Policy Analysis</h1>
+  <p class="page-sub">Describe your policy below — CivicLens will evaluate its pros, cons, and give it a score.</p>
+  <div class="input-card">
+    <label class="input-label" for="policyInput">Enter your policy</label>
+    <textarea id="policyInput" placeholder="e.g. Introduce free school meals for all students in government schools, funded by a 2% corporate tax cess…" oninput="updateCharCount()" maxlength="2000"></textarea>
+    <div class="input-footer">
+      <span class="char-count" id="charCount">0 / 2000 characters</span>
+      <button class="btn-analyze" id="analyzeBtn" onclick="runAnalysis()">
+        <span>🔍</span>
+        <span class="btn-label">Analyze Policy</span>
+      </button>
+    </div>
+  </div>
+  <div class="error-card" id="errorCard"></div>
+</main>
+
+<!-- LOADING OVERLAY -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-ring">
+    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+      <circle class="track" cx="50" cy="50" r="42"/>
+      <circle class="arc"   cx="50" cy="50" r="42"/>
+    </svg>
+    <div class="loading-ring-icon" id="loadingIcon">🔍</div>
+  </div>
+  <div style="text-align:center;">
+    <p class="loading-title">Analyzing Policy…</p>
+    <p class="loading-sub" id="loadingSub">Please wait while our AI agents evaluate your policy</p>
+  </div>
+  <div class="steps-row">
+    <div class="step-pill" id="step1"><span class="step-dot"></span> Positive Impacts</div>
+    <div class="step-pill" id="step2"><span class="step-dot"></span> Negative Impacts</div>
+    <div class="step-pill" id="step3"><span class="step-dot"></span> Scoring</div>
+  </div>
+</div>
+
+<!-- RESULTS MODAL -->
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+
+    <!-- Score header -->
+    <div class="modal-header">
+      <div class="modal-header-left">
+        <div class="modal-score-ring">
+          <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <circle class="ring-track" cx="50" cy="50" r="42"/>
+            <circle class="ring-fill" id="ringFill" cx="50" cy="50" r="42" stroke-dasharray="264" stroke-dashoffset="264"/>
+          </svg>
+          <div class="modal-score-num">
+            <span class="num" id="modalScoreNum">—</span>
+            <span class="denom">/ 100</span>
+          </div>
+        </div>
+        <div class="modal-score-info">
+          <p class="modal-score-title" id="modalScoreTitle">Policy Score</p>
+          <p class="modal-score-just" id="modalScoreJust"></p>
+        </div>
+      </div>
+      <div class="modal-header-actions">
+        <button class="modal-close" onclick="closeModal()" title="Close">✕</button>
+      </div>
+    </div>
+
+    <!-- 🌐 Language + 🔊 Speak toolbar -->
+    <div class="modal-toolbar">
+      <span class="toolbar-label">Language</span>
+      <button class="lang-btn active" id="langEN" onclick="switchLang('en')">🇬🇧 English</button>
+      <button class="lang-btn" id="langHI" onclick="switchLang('hi')">🇮🇳 Hindi</button>
+      <button class="lang-btn" id="langTE" onclick="switchLang('te')">🏳 Telugu</button>
+      <div class="toolbar-divider"></div>
+      <button class="btn-speak" id="speakBtn" onclick="toggleSpeak()">
+        <span id="speakIcon">🔊</span>
+        <span id="speakLabel">Read Aloud</span>
+      </button>
+      <div class="translating-badge" id="translatingBadge">
+        <div class="translating-spin"></div>
+        Translating…
+      </div>
+    </div>
+
+    <!-- Body -->
+    <div class="modal-body">
+      <div class="analyzed-policy">
+        <strong>Policy analyzed:</strong> <span id="analyzedPolicyText"></span>
+      </div>
+      <div class="results-grid">
+        <div class="result-card">
+          <div class="result-card-header">
+            <span class="result-card-icon">✅</span>
+            <span class="result-card-title green" id="prosTitle">Positive Impacts</span>
+          </div>
+          <ul class="result-list" id="prosList"></ul>
+        </div>
+        <div class="result-card">
+          <div class="result-card-header">
+            <span class="result-card-icon">❌</span>
+            <span class="result-card-title red" id="consTitle">Negative Impacts</span>
+          </div>
+          <ul class="result-list" id="consList"></ul>
+        </div>
+        <div class="result-card">
+          <div class="result-card-header">
+            <span class="result-card-icon">🔧</span>
+            <span class="result-card-title amber" id="corrTitle">Suggested Improvements</span>
+          </div>
+          <ul class="result-list" id="correctionsList"></ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-new" onclick="closeModal()">← Analyze another policy</button>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  // ── Keys ──────────────────────────────────────────────────────────
+  const SUPABASE_URL      = "https://bloaxjfbwpgetpvdguvv.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJsb2F4amZid3BnZXRwdmRndXZ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQxNDU5OTIsImV4cCI6MjA4OTcyMTk5Mn0.WHVF9Ts9JdE_cW2m8Q_6lFyl-URgFg-C-v482OCnT-0";
+  const API_BASE          = "http://localhost:5000";
+
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  let currentSession = null;
+  let lastPolicy     = "";
+  let rawData        = null;   // original English results
+  let currentLang    = "en";
+  let isSpeaking     = false;
+
+  // Session guard
+  (async () => {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) { window.location.href = "login.html"; return; }
+    currentSession = session;
+    document.getElementById("userEmail").textContent = session.user.email;
+  })();
+  sb.auth.onAuthStateChange((event, session) => {
+    if (event === "SIGNED_OUT") window.location.href = "login.html";
+    else if (session) currentSession = session;
+  });
+
+  async function handleLogout() { await sb.auth.signOut(); window.location.href = "login.html"; }
+  function updateCharCount() {
+    const len = document.getElementById("policyInput").value.length;
+    document.getElementById("charCount").textContent = `${len} / 2000 characters`;
+  }
+
+  // ── Sound helpers ─────────────────────────────────────────────────
+  function playTick() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator(), g = ctx.createGain();
+      osc.connect(g); g.connect(ctx.destination);
+      osc.type = "sine"; osc.frequency.value = 880;
+      g.gain.setValueAtTime(0, ctx.currentTime);
+      g.gain.linearRampToValueAtTime(0.1, ctx.currentTime + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+      osc.start(ctx.currentTime); osc.stop(ctx.currentTime + 0.2);
+    } catch(e) {}
+  }
+  function playSuccess() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      [[523,0],[659,0.12],[784,0.24],[1047,0.36]].forEach(([f,t]) => {
+        const osc = ctx.createOscillator(), g = ctx.createGain();
+        osc.connect(g); g.connect(ctx.destination);
+        osc.type = "sine"; osc.frequency.value = f;
+        const s = ctx.currentTime + t;
+        g.gain.setValueAtTime(0,s);
+        g.gain.linearRampToValueAtTime(0.18, s+0.04);
+        g.gain.exponentialRampToValueAtTime(0.001, s+0.35);
+        osc.start(s); osc.stop(s+0.4);
+      });
+    } catch(e) {}
+  }
+
+  // ── Loading steps ─────────────────────────────────────────────────
+  const STEP_IDS = ["step1","step2","step3"];
+  const ICONS    = ["🔍","⚖️","📊"];
+  const SUBS     = ["Agent 1 — Finding positive impacts…","Agent 2 — Finding negative impacts…","Agent 3 — Scoring and suggesting improvements…"];
+
+  function setLoadingStep(n) {
+    STEP_IDS.forEach((id,i) => {
+      const el = document.getElementById(id);
+      el.classList.remove("active","done");
+      if (i+1 < n)  el.classList.add("done");
+      if (i+1 === n) el.classList.add("active");
+    });
+    document.getElementById("loadingIcon").textContent = ICONS[n-1];
+    document.getElementById("loadingSub").textContent  = SUBS[n-1];
+    playTick();
+  }
+  function showLoading() { document.getElementById("loadingOverlay").classList.add("visible"); }
+  function hideLoading() { document.getElementById("loadingOverlay").classList.remove("visible"); }
+  function showError(msg) { const el=document.getElementById("errorCard"); el.textContent=msg; el.classList.add("visible"); }
+  function hideError()    { document.getElementById("errorCard").classList.remove("visible"); }
+  function scoreColor(s)  { return s>=70?"green":s>=45?"amber":"red"; }
+
+  // ── Translation (MyMemory free API) ───────────────────────────────
+  async function translateText(text, targetLang) {
+    if (targetLang === "en") return text;
+    try {
+      const langCode = targetLang === "hi" ? "hi-IN" : "te-IN";
+      const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|${langCode}`;
+      const res  = await fetch(url);
+      const json = await res.json();
+      return json.responseData?.translatedText || text;
+    } catch(e) {
+      return text; // fallback to English if translation fails
+    }
+  }
+
+  async function translateArray(arr, lang) {
+    return Promise.all(arr.map(t => translateText(t, lang)));
+  }
+
+  // ── Language switcher ─────────────────────────────────────────────
+  async function switchLang(lang) {
+    if (lang === currentLang || !rawData) return;
+    currentLang = lang;
+
+    // Update active button
+    ["langEN","langHI","langTE"].forEach(id => document.getElementById(id).classList.remove("active"));
+    document.getElementById(lang === "en" ? "langEN" : lang === "hi" ? "langHI" : "langTE").classList.add("active");
+
+    // Stop speaking if active
+    stopSpeak();
+
+    if (lang === "en") {
+      // Restore original English instantly
+      renderLists(rawData.pros, rawData.cons, rawData.corrections);
+      document.getElementById("modalScoreJust").textContent = rawData.justification;
+      document.getElementById("prosTitle").textContent  = "Positive Impacts";
+      document.getElementById("consTitle").textContent  = "Negative Impacts";
+      document.getElementById("corrTitle").textContent  = "Suggested Improvements";
+      return;
+    }
+
+    // Show translating badge
+    document.getElementById("translatingBadge").classList.add("visible");
+
+    const headings = lang === "hi"
+      ? ["सकारात्मक प्रभाव", "नकारात्मक प्रभाव", "सुझाव"]
+      : ["సానుకూల ప్రభావాలు", "ప్రతికూల ప్రభావాలు", "సూచనలు"];
+
+    try {
+      const [tPros, tCons, tCorr, tJust] = await Promise.all([
+        translateArray(rawData.pros,        lang),
+        translateArray(rawData.cons,        lang),
+        translateArray(rawData.corrections, lang),
+        translateText(rawData.justification, lang),
+      ]);
+
+      renderLists(tPros, tCons, tCorr);
+      document.getElementById("modalScoreJust").textContent = tJust;
+      document.getElementById("prosTitle").textContent  = headings[0];
+      document.getElementById("consTitle").textContent  = headings[1];
+      document.getElementById("corrTitle").textContent  = headings[2];
+    } catch(e) {
+      console.error("Translation failed:", e);
+    }
+
+    document.getElementById("translatingBadge").classList.remove("visible");
+  }
+
+  // ── Text to Speech ────────────────────────────────────────────────
+  function buildSpeechText(data) {
+    const pros  = (data.pros        || []).join(". ");
+    const cons  = (data.cons        || []).join(". ");
+    const corr  = (data.corrections || []).join(". ");
+    const score = rawData?.score ?? "";
+    return `Policy score: ${score} out of 100. 
+      Positive impacts: ${pros}. 
+      Negative impacts: ${cons}. 
+      Suggested improvements: ${corr}.`;
+  }
+
+  function toggleSpeak() {
+    if (isSpeaking) { stopSpeak(); return; }
+    startSpeak();
+  }
+
+  function startSpeak() {
+    if (!window.speechSynthesis) { alert("Sorry, your browser doesn't support text-to-speech."); return; }
+
+    // Collect current visible text from lists
+    const getText = id => Array.from(document.querySelectorAll(`#${id} li span:last-child`)).map(el=>el.textContent).join(". ");
+    const score   = document.getElementById("modalScoreNum").textContent;
+    const just    = document.getElementById("modalScoreJust").textContent;
+
+    const fullText = `Policy score: ${score} out of 100. ${just}. 
+      Positive impacts: ${getText("prosList")}. 
+      Negative impacts: ${getText("consList")}. 
+      Suggested improvements: ${getText("correctionsList")}.`;
+
+    const utter = new SpeechSynthesisUtterance(fullText);
+
+    // Pick language voice
+    if (currentLang === "hi") utter.lang = "hi-IN";
+    else if (currentLang === "te") utter.lang = "te-IN";
+    else utter.lang = "en-US";
+
+    utter.rate   = 0.92;
+    utter.pitch  = 1;
+    utter.volume = 1;
+
+    utter.onend = () => setSpeakState(false);
+    utter.onerror = () => setSpeakState(false);
+
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utter);
+    setSpeakState(true);
+  }
+
+  function stopSpeak() {
+    window.speechSynthesis?.cancel();
+    setSpeakState(false);
+  }
+
+  function setSpeakState(speaking) {
+    isSpeaking = speaking;
+    const btn = document.getElementById("speakBtn");
+    btn.classList.toggle("speaking", speaking);
+    document.getElementById("speakIcon").textContent  = speaking ? "⏹" : "🔊";
+    document.getElementById("speakLabel").textContent = speaking ? "Stop" : "Read Aloud";
+  }
+
+  // ── Render lists ──────────────────────────────────────────────────
+  function renderLists(pros, cons, corrections) {
+    document.getElementById("prosList").innerHTML =
+      (pros||[]).map(p=>`<li><span class="result-icon">•</span><span>${p}</span></li>`).join("")
+      || "<li>No positive impacts found.</li>";
+    document.getElementById("consList").innerHTML =
+      (cons||[]).map(c=>`<li><span class="result-icon">•</span><span>${c}</span></li>`).join("")
+      || "<li>No negative impacts found.</li>";
+    document.getElementById("correctionsList").innerHTML =
+      (corrections||[]).map(c=>`<li><span class="result-icon">•</span><span>${c}</span></li>`).join("")
+      || "<li>No suggestions available.</li>";
+  }
+
+  // ── Render modal ──────────────────────────────────────────────────
+  function renderModal(data) {
+    rawData     = data;
+    currentLang = "en";
+
+    // Reset language buttons
+    ["langEN","langHI","langTE"].forEach(id => document.getElementById(id).classList.remove("active"));
+    document.getElementById("langEN").classList.add("active");
+    document.getElementById("prosTitle").textContent = "Positive Impacts";
+    document.getElementById("consTitle").textContent = "Negative Impacts";
+    document.getElementById("corrTitle").textContent = "Suggested Improvements";
+
+    const score = data.score ?? 0;
+    const color = scoreColor(score);
+
+    document.getElementById("modalScoreNum").textContent = score;
+    document.getElementById("modalScoreNum").className   = `num ${color}`;
+
+    // Animated ring
+    const ring = document.getElementById("ringFill");
+    ring.className = `ring-fill ${color}`;
+    const circumference = 2 * Math.PI * 42;
+    const offset = circumference - (score/100)*circumference;
+    setTimeout(() => { ring.style.strokeDashoffset = offset; }, 100);
+
+    document.getElementById("modalScoreTitle").textContent =
+      score>=70 ? "✅ Good Policy — Ready to Implement" :
+      score>=45 ? "⚠️ Needs Improvement Before Implementation" :
+                  "❌ Poor Policy — Major Rework Required";
+    document.getElementById("modalScoreJust").textContent = data.justification || "";
+    document.getElementById("analyzedPolicyText").textContent =
+      lastPolicy.length > 120 ? lastPolicy.slice(0,120)+"…" : lastPolicy;
+
+    renderLists(data.pros, data.cons, data.corrections);
+    document.getElementById("modalBackdrop").classList.add("visible");
+
+    // Auto-read after short delay
+    setTimeout(() => startSpeak(), 800);
+    playSuccess();
+  }
+
+  function closeModal() {
+    stopSpeak();
+    document.getElementById("modalBackdrop").classList.remove("visible");
+    STEP_IDS.forEach(id => document.getElementById(id).classList.remove("active","done"));
+  }
+
+  document.getElementById("modalBackdrop").addEventListener("click", function(e) {
+    if (e.target === this) closeModal();
+  });
+
+  // ── Run Analysis ──────────────────────────────────────────────────
+  async function runAnalysis() {
+    const policy = document.getElementById("policyInput").value.trim();
+    if (!policy)            { showError("Please enter a policy before running the analysis."); return; }
+    if (policy.length < 20) { showError("Please describe the policy in more detail (at least 20 characters)."); return; }
+
+    hideError();
+    lastPolicy = policy;
+    stopSpeak();
+
+    const btn = document.getElementById("analyzeBtn");
+    btn.disabled = true;
+    btn.querySelector(".btn-label").textContent = "Analyzing…";
+
+    showLoading();
+    setLoadingStep(1);
+
+    try {
+      await new Promise(r => setTimeout(r, 800));
+      setLoadingStep(2);
+
+      const response = await fetch(`${API_BASE}/analyze`, {
+        method:"POST",
+        headers:{ "Content-Type":"application/json", "Authorization":`Bearer ${currentSession?.access_token??""}` },
+        body: JSON.stringify({ policy })
+      });
+
+      setLoadingStep(3);
+      await new Promise(r => setTimeout(r, 600));
+
+      if (!response.ok) {
+        let errMsg = `Server error (${response.status})`;
+        try { const e = await response.json(); errMsg = e.detail ?? errMsg; } catch(_) {}
+        throw new Error(errMsg);
+      }
+
+      const data = await response.json();
+      await new Promise(r => setTimeout(r, 400));
+
+      hideLoading();
+      renderModal(data);
+
+    } catch(err) {
+      hideLoading();
+      showError("Analysis failed: " + err.message + "\n\nMake sure your Python backend is running:\n  cd backend\n  python -m uvicorn main:app --host 0.0.0.0 --port 5000");
+    } finally {
+      btn.disabled = false;
+      btn.querySelector(".btn-label").textContent = "Analyze Policy";
+    }
+  }
+</script>
+</body>
+</html>
