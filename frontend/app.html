@@ -182,7 +182,7 @@
 <body>
 
 <header class="topbar">
-  <a href="index.html" class="topbar-logo">Civic<span>Lens</span></a>
+  <a href="/" class="topbar-logo">Civic<span>Lens</span></a>
   <div class="topbar-right">
     <span class="user-email" id="userEmail"></span>
     <button class="btn-logout" onclick="handleLogout()">Log out</button>
@@ -323,16 +323,16 @@
   // Session guard
   (async () => {
     const { data: { session } } = await sb.auth.getSession();
-    if (!session) { window.location.href = "login.html"; return; }
+    if (!session) { window.location.href = "/login"; return; }
     currentSession = session;
     document.getElementById("userEmail").textContent = session.user.email;
   })();
   sb.auth.onAuthStateChange((event, session) => {
-    if (event === "SIGNED_OUT") window.location.href = "login.html";
+    if (event === "SIGNED_OUT") window.location.href = "/login";
     else if (session) currentSession = session;
   });
 
-  async function handleLogout() { await sb.auth.signOut(); window.location.href = "login.html"; }
+  async function handleLogout() { await sb.auth.signOut(); window.location.href = "/login"; }
   function updateCharCount() {
     const len = document.getElementById("policyInput").value.length;
     document.getElementById("charCount").textContent = `${len} / 2000 characters`;
