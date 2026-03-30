@@ -13,7 +13,11 @@ app = FastAPI(title="CivicLens API", version="1.0.0")
 # Allow frontend to call this backend (CORS)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],       # In production: replace with your frontend URL
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "https://civiclens-ivory.vercel.app"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

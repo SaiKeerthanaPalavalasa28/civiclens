@@ -31,6 +31,7 @@ venv.bak/
 .env.test.local
 .env.production.local
 .envSecret
+.env.production
 
 # IDE / Editor
 .vscode/
