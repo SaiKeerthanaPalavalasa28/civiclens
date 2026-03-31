@@ -19,11 +19,11 @@ You enter a policy, and the system tells you what could go right, what could go 
 
 ## Tech used
 
-- Frontend: HTML, CSS, JavaScript
+- Frontend: React.js
 - Backend: Python with FastAPI
 - AI: Hugging Face API — Qwen 2.5 72B model
 - Authentication: Supabase (email and Google login)
-- Deployed on: Netlify (frontend) and Render (backend)
+- Deployed on: Vercel (frontend) and Render (backend)
 
 ---
 
